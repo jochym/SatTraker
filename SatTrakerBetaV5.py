@@ -44,6 +44,7 @@ class trackSettings:
     flip = 'NoFlip'
     foundtarget = False
     rotate = 0
+    calibratestart = False
     
 
 class videotrak:
@@ -155,9 +156,7 @@ class videotrak:
             imageroi = thresh.copy()
         return(roibox, imageroi)
     
-
 class buttons:       
-    
     def __init__(self, master):
         self.collect_images = False
         self.topframe = Frame(master)
@@ -333,6 +332,10 @@ class buttons:
         else:
             trackSettings.trackingsat = False
             self.startButton4.configure(text='Start Tracking Satellite')
+            if trackSettings.telescopetype == 'ASCOM' and trackSettings.trackingsat is False:
+                self.tel.MoveAxis(0, 0.0)
+                self.tel.MoveAxis(1, 0.0)
+                self.tel.AbortSlew()
         if trackSettings.tracking is False:
             print('Connect the Scope First!')
             self.textbox.insert(END, 'Connect the Scope First!\n')
@@ -436,7 +439,7 @@ class buttons:
                     d = datetime.datetime.utcnow()
                     self.observer.date = (d + datetime.timedelta(seconds=0))
                     self.sat.compute(self.observer)
-                    if trackSettings.mounttype == 'AltAz':
+                    if trackSettings.mounttype == 'AltAz' and trackSettings.trackingsat is True:
                         self.radalt = self.sat.alt
                         self.radaz = self.sat.az
                         self.observer.date = (d + datetime.timedelta(seconds=1))
@@ -448,7 +451,7 @@ class buttons:
                         self.textbox.see('end')
                         azrate = (math.degrees(self.radaz2 - self.radaz))
                         altrate = math.degrees(self.radalt2 - self.radalt)
-                        self.tel.Tracking = False
+                        #self.tel.Tracking = False
                         self.tel.SlewToAltAz(math.degrees(self.radaz2),math.degrees(self.radalt2))
                         print(azrate, altrate)
                         if azrate > self.axis0rate:
@@ -461,7 +464,7 @@ class buttons:
                             altrate = (-1*self.axis1rate)
                         self.tel.MoveAxis(0, azrate)
                         self.tel.MoveAxis(1, altrate)
-                    if trackSettings.mounttype == 'Eq':
+                    if trackSettings.mounttype == 'Eq' and trackSettings.trackingsat is True:
                         self.raddec = self.sat.dec
                         self.radra = self.sat.ra
                         self.observer.date = (d + datetime.timedelta(seconds=1))
@@ -473,7 +476,7 @@ class buttons:
                         self.textbox.see('end')
                         rarate = -1*(math.degrees(self.radra2 - self.radra))*math.cos(self.raddec2)
                         decrate = math.degrees(self.raddec2 - self.raddec)
-                        self.tel.Tracking = False
+                        #self.tel.Tracking = False
                         self.tel.SlewToCoordinates((math.degrees(self.radra2)/15),math.degrees(self.raddec2))
                         print(rarate, decrate)
                         if rarate > self.axis0rate:
@@ -498,7 +501,7 @@ class buttons:
                     self.observer.date = datetime.datetime.utcnow()
                     d = datetime.datetime.utcnow()
                     self.sat.compute(self.observer)
-                    if trackSettings.mounttype == 'AltAz':
+                    if trackSettings.mounttype == 'AltAz' and trackSettings.trackingsat is True:
                         self.radalt = self.sat.alt
                         self.radaz = self.sat.az
                         currentaz = self.tel.Azimuth
@@ -531,7 +534,7 @@ class buttons:
                         self.diffaltlast = diffalt
                         altcorrect = 0
                         azcorrect = 0
-                    if trackSettings.mounttype == 'Eq':
+                    if trackSettings.mounttype == 'Eq' and trackSettings.trackingsat is True:
                         self.raddec = self.sat.dec
                         self.radra = self.sat.ra
                         rahours = math.degrees(self.radra)/15
@@ -650,7 +653,7 @@ class buttons:
                     self.observer.date = datetime.datetime.utcnow()
                     d = datetime.datetime.utcnow()
                     self.sat.compute(self.observer)
-                    if trackSettings.mounttype == 'AltAz':
+                    if trackSettings.mounttype == 'AltAz' and trackSettings.trackingsat is True:
                         self.radalt = self.sat.alt
                         self.radaz = self.sat.az
                         currentaz = self.tel.Azimuth
@@ -699,7 +702,7 @@ class buttons:
                                 self.diffallast = altdiff
                             except:
                                 print('Failed to do the math.')
-                    if trackSettings.mounttype == 'Eq':
+                    if trackSettings.mounttype == 'Eq' and trackSettings.trackingsat is True:
                         self.raddec = self.sat.dec
                         self.radra = self.sat.ra
                         currentra = float(self.tel.RightAscension)*15
@@ -840,7 +843,7 @@ class buttons:
             time.sleep(0.005)
         #stop moving the telescope if the user is on ASCOM and requested stop tracking.
         if trackSettings.telescopetype == 'ASCOM' and trackSettings.trackingsat is False:
-            self.tel.AbortSlew
+            self.tel.AbortSlew()
     
     def set_center(self):
         trackSettings.setcenter = True
@@ -1003,6 +1006,12 @@ class buttons:
         calibthread.start()
     
     def set_calibration(self):
+        if trackSettings.calibratestart is False:
+            trackSettings.calibratestart = True
+        else:
+            self.tel.MoveAxis(1, 0.0)
+            #self.tel.AbortSlew()
+            trackSettings.calibratestart = False
         if trackSettings.tracking is False:
             print('Connect the Scope First!')
             self.textbox.insert(END, str('Connect the Scope First!\n'))
@@ -1015,8 +1024,7 @@ class buttons:
             print('Pick a stationary calibration object first!')
             self.textbox.insert(END, str('Pick a stationary target first!\n'))
             self.textbox.see('end')
-        if trackSettings.tracking is True and self.collect_images is True and trackSettings.objectfollow is True:
-            
+        if trackSettings.tracking is True and self.collect_images is True and trackSettings.objectfollow is True and trackSettings.calibratestart is True:
             if trackSettings.telescopetype == 'ASCOM':
                 if trackSettings.mounttype == 'AltAz':
                     self.X1 = math.radians(self.tel.Azimuth)
@@ -1026,12 +1034,14 @@ class buttons:
                     if starty < (self.height/2):
                         distmoved = 0
                         self.tel.MoveAxis(1, 0.1)
-                        while distmoved < 100:
+                        while distmoved < 100 and trackSettings.calibratestart is True:
+                            self.tel.MoveAxis(1, 0.1)
                             currentx = self.targetX
                             currenty = self.targetY
                             distmoved = math.sqrt((startx-currentx)**2+(starty-currenty)**2)
                             time.sleep(0.01)
-                        self.tel.AbortSlew
+                        self.tel.MoveAxis(1, 0.0)
+                        #self.tel.AbortSlew()
                         self.X2 = math.radians(self.tel.Azimuth)
                         self.Y2 = math.radians(self.tel.Altitude)
                         self.separation_between_coordinates()
@@ -1042,12 +1052,14 @@ class buttons:
                     else:
                         distmoved = 0
                         self.tel.MoveAxis(1, -0.1)
-                        while distmoved < 100:
+                        while distmoved < 100 and trackSettings.calibratestart is True:
+                            self.tel.MoveAxis(1, -0.1)
                             currentx = self.targetX
                             currenty = self.targetY
                             distmoved = math.sqrt((startx-currentx)**2+(starty-currenty)**2)
                             time.sleep(0.01)
-                        self.tel.AbortSlew
+                        self.tel.MoveAxis(1, 0.0)
+                        #self.tel.AbortSlew()
                         self.X2 = math.radians(self.tel.Azimuth)
                         self.Y2 = math.radians(self.tel.Altitude)
                         self.separation_between_coordinates()
@@ -1063,12 +1075,14 @@ class buttons:
                     if starty < (self.height/2):
                         distmoved = 0
                         self.tel.MoveAxis(1, 0.1)
-                        while distmoved < 100:
+                        while distmoved < 100 and trackSettings.calibratestart is True:
+                            self.tel.MoveAxis(1, 0.1)
                             currentx = self.targetX
                             currenty = self.targetY
                             distmoved = math.sqrt((startx-currentx)**2+(starty-currenty)**2)
                             time.sleep(0.01)
-                        self.tel.AbortSlew
+                        self.tel.MoveAxis(1, 0.0)
+                        #self.tel.AbortSlew()
                         self.X2 = math.radians(self.tel.RightAscension*15)
                         self.Y2 = math.radians(self.tel.Declination)
                         self.separation_between_coordinates()
@@ -1080,12 +1094,14 @@ class buttons:
                     else:
                         distmoved = 0
                         self.tel.MoveAxis(1, -0.1)
-                        while distmoved < 100:
+                        while distmoved < 100 and trackSettings.calibratestart is True:
+                            self.tel.MoveAxis(1, -0.1)
                             currentx = self.targetX
                             currenty = self.targetY
                             distmoved = math.sqrt((startx-currentx)**2+(starty-currenty)**2)
                             time.sleep(0.01)
-                        self.tel.AbortSlew
+                        self.tel.MoveAxis(1, 0.0)
+                        #self.tel.AbortSlew()
                         self.X2 = math.radians(self.tel.RightAscension*15)
                         self.Y2 = math.radians(self.tel.Declination)
                         self.separation_between_coordinates()
@@ -1142,7 +1158,7 @@ class buttons:
                     self.textbox.insert(END, str('Image scale: '+str(self.imagescale)+' degrees per pixel.\n'))
                     self.textbox.see('end')
                 trackSettings.imagescale = self.imagescale
-                
+            trackSettings.calibratestart = False    
     
     def separation_between_coordinates(self):
         self.separation = math.degrees(math.acos(math.sin(self.Y1)*math.sin(self.Y2) + math.cos(self.Y1)*math.cos(self.Y2)*math.cos(self.X1-self.X2)))
@@ -1330,8 +1346,7 @@ class buttons:
         else:
             print('Stopping Camera.')
             self.textbox.insert(END, str('Stopping Camera.\n'))
-            self.textbox.see('end')
-        
+            self.textbox.see('end')        
 After = None
 root = Tk()
 b = buttons(root)
