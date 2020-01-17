@@ -233,7 +233,7 @@ class buttons:
         #self.entryBright.grid(row = 8, column = 1)
         
         try:
-            config = open('Satconfig.txt', 'r')
+            config = open('satconfig.txt', 'r')
             clines = [line.rstrip('\n') for line in config]
             trackSettings.telescopetype = str(clines[0])
             trackSettings.mainviewX = int(clines[3])
@@ -308,9 +308,9 @@ class buttons:
         if os.name == 'nt': 
                 self.telescopeMenu.add_command(label='ASCOM Alt/Az', command=self.setASCOMAltAz)
                 self.telescopeMenu.add_command(label='ASCOM Equatorial', command=self.setASCOMEq)
-#       if os.name == 'posix': 
-#                self.telescopeMenu.add_command(label='INDI Alt/Az (NOT FUNCTIONAL YET)', command=self.setINDIAltAz)
-#                self.telescopeMenu.add_command(label='INDI Equatorial (NOT FUNCTIONAL YET)', command=self.setINDIEq)
+        if os.name == 'posix': 
+                self.telescopeMenu.add_command(label='INDI Alt/Az (NOT FUNCTIONAL YET)', command=self.setINDIAltAz)
+                self.telescopeMenu.add_command(label='INDI Equatorial (NOT FUNCTIONAL YET)', command=self.setINDIEq)
 
         
         
